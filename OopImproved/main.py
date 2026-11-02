@@ -1,8 +1,18 @@
 ﻿import os
+import sys
 from abc import ABC, abstractmethod
 from datetime import datetime
+from pathlib import Path
 
-from OopImproved.database import Database
+if __package__ in (None, ""):
+    parent_dir = str(Path(__file__).resolve().parent.parent)
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+
+try:
+    from OopImproved.database import Database
+except ModuleNotFoundError:
+    from database import Database
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
