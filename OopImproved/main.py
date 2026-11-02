@@ -1,10 +1,47 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+from OopImproved.database import Database
 
+
+db = Database("hospital_db.sqlite")
 patients = []
 doctors = []
 appointments = []
+
+
+def load_patients_from_db():
+    global patients
+    patients = []
+    for row in db.get_all_patients():
+        patient_type = row["patient_type"]
+        if patient_type == "Outpatient":
+            patient = Outpatient(row["name"], row["patient_id"], row["phone"], row["age"], row["balance"])
+        else:
+            patient = Inpatient(row["name"], row["patient_id"], row["phone"], row["age"], row["balance"])
+        patients.append(patient)
+
+
+def load_doctors_from_db():
+    global doctors
+    doctors = []
+    for row in db.get_all_doctors():
+        doctor = Doctor(row["name"], row["doctor_id"], row["specialization"], row["consultation_fee"])
+        doctors.append(doctor)
+
+
+def load_appointments_from_db():
+    global appointments
+    appointments = []
+    for row in db.get_all_appointments():
+        patient = find_patient(row["patient_id"])
+        doctor = find_doctor(row["doctor_id"])
+        if patient is None or doctor is None:
+            continue
+        appointment = Appointment(patient, doctor, row["appointment_date"], row["appointment_time"])
+        appointment.appointment_id = row["id"]
+        appointment.status = row["status"]
+        appointments.append(appointment)
 
 
 class HospitalService(ABC):
@@ -124,6 +161,7 @@ class Appointment:
         self.appointment_date = appointment_date
         self.appointment_time = appointment_time
         self.status = "Pending"
+        self.appointment_id = None
 
     def display_details(self):
         print("Appointment Details")
@@ -183,12 +221,15 @@ def register_patient():
 
         if patient_type_choice == "1":
             patient = Outpatient(name, patient_id, phone, age, balance)
+            patient_type = "Outpatient"
         elif patient_type_choice == "2":
             patient = Inpatient(name, patient_id, phone, age, balance)
+            patient_type = "Inpatient"
         else:
             print("Invalid patient type selected.")
             return
 
+        db.add_patient(patient_id, name, phone, age, balance, patient_type)
         patients.append(patient)
         print("Patient registered successfully.")
         return patient
@@ -216,6 +257,7 @@ def register_doctor():
             return
 
         doctor = Doctor(name, doctor_id, specialization, consultation_fee)
+        db.add_doctor(doctor_id, name, specialization, consultation_fee)
         doctors.append(doctor)
         print("Doctor registered successfully.")
         return doctor
@@ -244,6 +286,7 @@ def book_appointment():
         datetime.strptime(appointment_date, "%Y-%m-%d")
 
         appointment = Appointment(patient, doctor, appointment_date, appointment_time)
+        appointment.appointment_id = db.add_appointment(patient_id, doctor_id, appointment_date, appointment_time, "Confirmed")
         appointments.append(appointment)
         appointment.confirm_appointment()
         print("Appointment booked successfully.")
@@ -313,108 +356,122 @@ def demonstrate_polymorphism():
     print("--- End of Polymorphism Demo ---\n")
 
 
-demonstrate_polymorphism()
+def main():
+    demonstrate_polymorphism()
+    load_patients_from_db()
+    load_doctors_from_db()
+    load_appointments_from_db()
 
+    while True:
+        print("========================================")
+        print("SMART HOSPITAL MANAGEMENT")
+        print("========================================")
+        print("1. Register Patient")
+        print("2. Register Doctor")
+        print("3. Display All Patients")
+        print("4. Display All Doctors")
+        print("5. Book Appointment")
+        print("6. Display All Appointments")
+        print("7. Search Patient")
+        print("8. Deposit Money")
+        print("9. Withdraw Money")
+        print("10. Process Patient Payment")
+        print("11. Check Patient Balance")
+        print("12. Cancel Appointment")
+        print("13. Exit")
 
-while True:
-    print("========================================")
-    print("SMART HOSPITAL MANAGEMENT")
-    print("========================================")
-    print("1. Register Patient")
-    print("2. Register Doctor")
-    print("3. Display All Patients")
-    print("4. Display All Doctors")
-    print("5. Book Appointment")
-    print("6. Display All Appointments")
-    print("7. Search Patient")
-    print("8. Deposit Money")
-    print("9. Withdraw Money")
-    print("10. Process Patient Payment")
-    print("11. Check Patient Balance")
-    print("12. Cancel Appointment")
-    print("13. Exit")
-
-    try:
-        choice = input("Enter your choice: ").strip()
-        if choice == "1":
-            register_patient()
-        elif choice == "2":
-            register_doctor()
-        elif choice == "3":
-            display_patients()
-        elif choice == "4":
-            display_doctors()
-        elif choice == "5":
-            book_appointment()
-        elif choice == "6":
-            display_appointments()
-        elif choice == "7":
-            search_patient()
-        elif choice == "8":
-            patient_id = input("Enter patient ID: ").strip()
-            patient = find_patient(patient_id)
-            if patient is None:
-                print("Patient not found.")
-            else:
-                try:
-                    amount = float(input("Enter deposit amount: ").strip())
-                    patient.deposit_money(amount)
-                except ValueError:
-                    print("Invalid amount. Please enter a valid number.")
-        elif choice == "9":
-            patient_id = input("Enter patient ID: ").strip()
-            patient = find_patient(patient_id)
-            if patient is None:
-                print("Patient not found.")
-            else:
-                try:
-                    amount = float(input("Enter withdrawal amount: ").strip())
-                    patient.withdraw_money(amount)
-                except ValueError:
-                    print("Invalid amount. Please enter a valid number.")
-        elif choice == "10":
-            patient_id = input("Enter patient ID: ").strip()
-            doctor_id = input("Enter doctor ID: ").strip()
-            patient = find_patient(patient_id)
-            doctor = find_doctor(doctor_id)
-
-            if patient is None:
-                print("Patient not found.")
-            elif doctor is None:
-                print("Doctor not found.")
-            else:
-                if isinstance(patient, Outpatient):
-                    patient.process_payment(doctor.consultation_fee)
-                elif isinstance(patient, Inpatient):
-                    patient.process_payment(doctor.consultation_fee)
+        try:
+            choice = input("Enter your choice: ").strip()
+            if choice == "1":
+                register_patient()
+            elif choice == "2":
+                register_doctor()
+            elif choice == "3":
+                display_patients()
+            elif choice == "4":
+                display_doctors()
+            elif choice == "5":
+                book_appointment()
+            elif choice == "6":
+                display_appointments()
+            elif choice == "7":
+                search_patient()
+            elif choice == "8":
+                patient_id = input("Enter patient ID: ").strip()
+                patient = find_patient(patient_id)
+                if patient is None:
+                    print("Patient not found.")
                 else:
-                    print("Patient type not supported for payment.")
-        elif choice == "11":
-            patient_id = input("Enter patient ID: ").strip()
-            patient = find_patient(patient_id)
-            if patient is None:
-                print("Patient not found.")
-            else:
-                print(f"Current balance for {patient.name}: Ksh {patient.check_balance():.2f}")
-        elif choice == "12":
-            appointment_id = input("Enter appointment index to cancel: ").strip()
-            try:
-                index = int(appointment_id)
-                if 0 <= index < len(appointments):
-                    appointments[index].cancel_appointment()
+                    try:
+                        amount = float(input("Enter deposit amount: ").strip())
+                        if patient.deposit_money(amount):
+                            db.update_patient_balance(patient.patient_id, patient.check_balance())
+                    except ValueError:
+                        print("Invalid amount. Please enter a valid number.")
+            elif choice == "9":
+                patient_id = input("Enter patient ID: ").strip()
+                patient = find_patient(patient_id)
+                if patient is None:
+                    print("Patient not found.")
                 else:
-                    print("Invalid appointment index.")
-            except ValueError:
-                print("Invalid input. Please enter a valid number.")
-        elif choice == "13":
-            print("Exiting SMART HOSPITAL MANAGEMENT system. Goodbye!")
-            break
-        else:
-            print("Invalid choice. Please select a number from 1 to 13.")
+                    try:
+                        amount = float(input("Enter withdrawal amount: ").strip())
+                        if patient.withdraw_money(amount):
+                            db.update_patient_balance(patient.patient_id, patient.check_balance())
+                    except ValueError:
+                        print("Invalid amount. Please enter a valid number.")
+            elif choice == "10":
+                patient_id = input("Enter patient ID: ").strip()
+                doctor_id = input("Enter doctor ID: ").strip()
+                patient = find_patient(patient_id)
+                doctor = find_doctor(doctor_id)
 
-        print()
-    except Exception as error:
-        print(f"An unexpected error occurred: {error}")
+                if patient is None:
+                    print("Patient not found.")
+                elif doctor is None:
+                    print("Doctor not found.")
+                else:
+                    if isinstance(patient, Outpatient):
+                        if patient.process_payment(doctor.consultation_fee):
+                            db.update_patient_balance(patient.patient_id, patient.check_balance())
+                    elif isinstance(patient, Inpatient):
+                        if patient.process_payment(doctor.consultation_fee):
+                            db.update_patient_balance(patient.patient_id, patient.check_balance())
+                    else:
+                        print("Patient type not supported for payment.")
+            elif choice == "11":
+                patient_id = input("Enter patient ID: ").strip()
+                patient = find_patient(patient_id)
+                if patient is None:
+                    print("Patient not found.")
+                else:
+                    print(f"Current balance for {patient.name}: Ksh {patient.check_balance():.2f}")
+            elif choice == "12":
+                appointment_id = input("Enter appointment index to cancel: ").strip()
+                try:
+                    index = int(appointment_id)
+                    if 0 <= index < len(appointments):
+                        appointments[index].cancel_appointment()
+                        if appointments[index].appointment_id is not None:
+                            db.update_appointment_status(appointments[index].appointment_id, "Cancelled")
+                    else:
+                        print("Invalid appointment index.")
+                except ValueError:
+                    print("Invalid input. Please enter a valid number.")
+            elif choice == "13":
+                print("Exiting SMART HOSPITAL MANAGEMENT system. Goodbye!")
+                db.close()
+                break
+            else:
+                print("Invalid choice. Please select a number from 1 to 13.")
+
+            print()
+        except Exception as error:
+            print(f"An unexpected error occurred: {error}")
+
+
+if __name__ == "__main__":
+    main()
 
 
 
